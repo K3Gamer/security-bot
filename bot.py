@@ -111,8 +111,6 @@ warnings = defaultdict(
     }
 )
 
-spam_tracker = defaultdict(list)
-
 restrict_data = {
     int(k): v
     for k, v in data.get(
@@ -275,8 +273,9 @@ async def on_message(message):
                 "reason": f"Dùng từ cấm: {word}",
                 "date": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                 "admin": "System"
+                
             })
-
+            save_data()
             await auto_punish(message)
 
             try:
@@ -288,53 +287,19 @@ async def on_message(message):
                 pass
 
             return
-
-    # =========================
-    # SPAM FILTER
-    # =========================
-    now = datetime.utcnow()
-
-    spam_tracker[message.author.id].append(now)
-
-    spam_tracker[message.author.id] = [
-        t for t in spam_tracker[message.author.id]
-        if (now - t).seconds <= 5
-    ]
-
-    if len(spam_tracker[message.author.id]) >= 5:
-
-        try:
-            await message.delete()
-        except:
-            pass
-
-        warnings[message.author.id].append({
-            "reason": "Spam tin nhắn",
-            "date": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-            "admin": "System"
-        })
-
-        await auto_punish(message)
-
-        try:
-            await message.channel.send(
-                f"⚠️ {message.author.mention}, đừng spam!",
-                delete_after=5
-            )
-        except:
-            pass
-
-        return
-
     await bot.process_commands(message)
 
 # =========================
 # ROLE
 # =========================
 @bot.tree.command(name="role")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Add", value="add"),
+    app_commands.Choice(name="Remove", value="remove")
+])
 async def role(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member,
     role: discord.Role
 ):
@@ -347,15 +312,15 @@ async def role(
         )
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         await member.add_roles(role)
-
+        save_data()
         await interaction.response.send_message(
             f"✅ Đã thêm {role.mention}"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         await member.remove_roles(role)
 
@@ -367,9 +332,13 @@ async def role(
 # ADMIN
 # =========================
 @bot.tree.command(name="admin")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Add", value="add"),
+    app_commands.Choice(name="Remove", value="remove")
+])
 async def admin(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member
 ):
 
@@ -389,7 +358,7 @@ async def admin(
     if role is None:
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         await member.add_roles(role)
 
@@ -397,7 +366,7 @@ async def admin(
             f"👑 Đã cấp admin"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         await member.remove_roles(role)
 
@@ -409,9 +378,13 @@ async def admin(
 # SUPER MEMBER
 # =========================
 @bot.tree.command(name="supermember")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Add", value="add"),
+    app_commands.Choice(name="Remove", value="remove")
+])
 async def supermember(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member
 ):
 
@@ -431,7 +404,7 @@ async def supermember(
     if role is None:
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         await member.add_roles(role)
 
@@ -439,7 +412,7 @@ async def supermember(
             f"🌟 Đã cấp Super Member"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         await member.remove_roles(role)
 
@@ -451,9 +424,13 @@ async def supermember(
 # WHITELIST
 # =========================
 @bot.tree.command(name="whitelist")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Add", value="add"),
+    app_commands.Choice(name="Remove", value="remove")
+])
 async def whitelist_cmd(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member
 ):
 
@@ -465,7 +442,7 @@ async def whitelist_cmd(
         )
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         whitelist.add(member.id)
 
@@ -473,21 +450,25 @@ async def whitelist_cmd(
             f"✅ Đã whitelist"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         whitelist.discard(member.id)
 
         await interaction.response.send_message(
             f"❌ Đã gỡ whitelist"
         )
-
+    save_data()
 # =========================
 # RESTRICT
 # =========================
 @bot.tree.command(name="restrict")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Restrict", value="add"),
+    app_commands.Choice(name="Unrestrict", value="remove")
+])
 async def restrict(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member,
     days: int = 1,
     reason: str = "Không có"
@@ -509,7 +490,7 @@ async def restrict(
     if role is None:
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         await member.add_roles(role)
 
@@ -518,8 +499,9 @@ async def restrict(
         )
 
         restrict_data[member.id] = {
-            "expire": expire
+            "expire": expire.isoformat()
         }
+        save_data()
 
         warnings[member.id].append({
             "reason": f"Restrict: {reason}",
@@ -531,7 +513,7 @@ async def restrict(
             f"🔒 Đã restrict {member.mention}"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         await member.remove_roles(role)
 
@@ -546,9 +528,13 @@ async def restrict(
 # MUTE
 # =========================
 @bot.tree.command(name="mute")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Mute", value="add"),
+    app_commands.Choice(name="Unmute", value="remove")
+])
 async def mute(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member
 ):
 
@@ -568,7 +554,7 @@ async def mute(
     if role is None:
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         await member.add_roles(role)
 
@@ -576,21 +562,25 @@ async def mute(
             f"🔇 Đã mute"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         await member.remove_roles(role)
 
         await interaction.response.send_message(
             f"🔊 Đã unmute"
         )
-
+    save_data()
 # =========================
 # BAN
 # =========================
 @bot.tree.command(name="ban")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Ban", value="add"),
+    app_commands.Choice(name="Unban", value="remove")
+])
 async def ban(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member = None,
     user_id: str = None,
     reason: str = "Không có"
@@ -604,7 +594,7 @@ async def ban(
         )
         return
 
-    if action.lower() == "add":
+    if action.value == "add":
 
         if member is None:
             return
@@ -615,7 +605,7 @@ async def ban(
             f"🔨 Đã ban"
         )
 
-    elif action.lower() == "remove":
+    elif action.value == "remove":
 
         if user_id is None:
             return
@@ -634,16 +624,23 @@ async def ban(
 # WARN
 # =========================
 @bot.tree.command(name="warn")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Add", value="add"),
+    app_commands.Choice(name="Remove", value="remove"),
+    app_commands.Choice(name="Clear", value="clear"),
+    app_commands.Choice(name="View", value="view"),
+    app_commands.Choice(name="Top", value="top")
+])
 async def warn(
     interaction: discord.Interaction,
-    action: str,
+    action: app_commands.Choice[str],
     member: discord.Member = None,
     reason: str = "Không có",
     amount: int = 1,
     warn_number: int = 1
 ):
 
-    action = action.lower()
+    action = action.value.lower()
 
     # VIEW
     if action == "view":
@@ -736,7 +733,7 @@ async def warn(
         await interaction.response.send_message(
             f"⚠️ Đã warn {member.mention}"
         )
-
+        save_data()    
     # REMOVE WARN
     elif action == "remove":
 
@@ -753,7 +750,7 @@ async def warn(
         await interaction.response.send_message(
             f"🗑️ Đã xóa warn"
         )
-
+        save_data()
     # CLEAR WARN
     elif action == "clear":
 
@@ -762,7 +759,7 @@ async def warn(
         await interaction.response.send_message(
             f"✅ Đã clear warn"
         )
-
+        save_data()
 # =========================
 # CHAT
 # =========================
@@ -961,7 +958,12 @@ async def auto_unrestrict():
 
     for user_id, info in restrict_data.items():
 
-        if now >= info["expire"]:
+        expire = info["expire"]
+        
+        if isinstance(expire, str):
+            expire = datetime.fromisoformat(expire)
+        
+        if now >= expire:
 
             member = guild.get_member(
                 user_id
@@ -975,10 +977,11 @@ async def auto_unrestrict():
                     pass
 
             remove_list.append(user_id)
-
+    
     for uid in remove_list:
         del restrict_data[uid]
-
+        save_data()
+    save_data()
 # =========================
 # START BOT
 # =========================
